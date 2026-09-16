@@ -49,12 +49,17 @@ type Store interface {
 	// BumpChatLastMessage updates a chat's last-message preview and ordering
 	// without appending to its message slice (e.g. a forward target).
 	BumpChatLastMessage(chatID int64, msg domain.Message)
-	UpdateMessageText(chatID int64, msgID int, text string, entities []domain.MessageEntity, editDate time.Time)
+	UpdateMessageText(chatID int64, msgID int, text string, entities []domain.MessageEntity)
+	// MarkMessageEdited records when a message was last edited and whether
+	// Telegram asked for the "edited" label to be hidden. It is separate from
+	// the text write because a hidden edit changes the text without earning the
+	// label, and a reaction bump earns neither (#269).
+	MarkMessageEdited(chatID int64, msgID int, editDate time.Time, hidden bool)
 	UpdateMessageReactions(chatID int64, msgID int, reactions []domain.Reaction)
 	UpdateMessageMedia(chatID int64, msgID int, photo *domain.PhotoRef, document *domain.DocumentRef)
 	// ReplaceMessage overwrites a stored message wholesale. It is how a refused
-	// edit is undone: the field-wise updates always stamp an EditDate, and a
-	// message that was never edited must not keep that marker (#118).
+	// edit is undone: no field-wise update clears an edit marker, and a message
+	// that was never edited must not keep one (#118).
 	ReplaceMessage(chatID int64, msg domain.Message)
 	RemoveMessage(chatID int64, msgID int)
 	RemoveMessages(chatID int64, msgIDs []int)

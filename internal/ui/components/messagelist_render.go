@@ -195,7 +195,7 @@ func (ml *MessageList) measureBubbleWithStatus(msg domain.Message, statusOverrid
 		}
 	}
 	editMark := ""
-	if msg.EditDate != nil {
+	if msg.ShowsEdited() {
 		// The separator belongs to the run it follows: rendered with it, the
 		// glyph carries both the canvas and a colour the theme owns.
 		editMark = theme.S().Timestamp.Render("edited · ")
@@ -492,7 +492,7 @@ func (ml *MessageList) renderBareMedia(msg domain.Message, selected bool) []stri
 		}
 	}
 	editMark := ""
-	if msg.EditDate != nil {
+	if msg.ShowsEdited() {
 		// The separator belongs to the run it follows: rendered with it, the
 		// glyph carries both the canvas and a colour the theme owns.
 		editMark = theme.S().Timestamp.Render("edited · ")

@@ -406,7 +406,10 @@ func (s *SQLiteStore) AppendMessage(msg domain.Message) {
 // UpdateMessageText replaces a message's text and its entities together. They
 // must move as a unit: entity offsets address the text they were parsed from,
 // so keeping the old ones would leave them pointing at characters that changed.
-func (s *SQLiteStore) UpdateMessageText(chatID int64, msgID int, text string, entities []domain.MessageEntity, editDate time.Time) {
+//
+// The edit marker is not touched here. Whether an edit earns the "edited" label
+// is Telegram's to say, and it says so separately (#269).
+func (s *SQLiteStore) UpdateMessageText(chatID int64, msgID int, text string, entities []domain.MessageEntity) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.messages[chatID] {
@@ -415,8 +418,21 @@ func (s *SQLiteStore) UpdateMessageText(chatID int64, msgID int, text string, en
 			cp := make([]domain.MessageEntity, len(entities))
 			copy(cp, entities)
 			s.messages[chatID][i].Entities = cp
+			s.markMsgDirtyLocked(chatID, msgID)
+			return
+		}
+	}
+}
+
+// MarkMessageEdited records the edit time and whether the label is hidden.
+func (s *SQLiteStore) MarkMessageEdited(chatID int64, msgID int, editDate time.Time, hidden bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.messages[chatID] {
+		if s.messages[chatID][i].ID == msgID {
 			t := editDate
 			s.messages[chatID][i].EditDate = &t
+			s.messages[chatID][i].EditHidden = hidden
 			s.markMsgDirtyLocked(chatID, msgID)
 			return
 		}

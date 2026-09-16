@@ -23,27 +23,22 @@ func (s *State) ApplyIncoming(msg domain.Message) (Change, bool) {
 
 // ApplyEdit records a message edited on another client.
 //
-// Every edit update carries the message's whole current reaction set, so the
-// reactions are applied either way. What EditDate decides is only whether the
-// text changed too:
+// An edit update carries the message's whole current state, so everything in it
+// is applied: the text, the entities and the reaction set. None of the three is
+// an alternative to the others, and treating them as such dropped reactions
+// until the chat was reopened (#199).
 //
-// A nil EditDate means the converter dropped it as a hidden edit (Telegram
-// edit_hide), for example a reaction bump. That is not a content edit and must
-// not flip the message to "edited" (#118) — but in 1:1 chats an incoming
-// reaction is delivered ONLY as this hidden edit, carrying the message's new
-// reactions rather than a separate UpdateMessageReactions (#160). So a hidden
-// edit is applied as, and reported as, a reactions change.
-//
-// A non-nil EditDate is a real content edit — or a reaction on a message that
-// was genuinely edited earlier, where edit_date still carries the original edit
-// time and edit_hide is false because the "edited" label should keep showing.
-// Text and reactions are not alternatives, and treating them as such dropped
-// those reactions until the chat was reopened (#199).
+// The edit marker is the only conditional part. A message nobody edited carries
+// no edit date and must not be given one: in a 1:1 chat an incoming reaction is
+// delivered as an edit and nothing else (#160), and it must not flip the
+// message to "edited" (#118). Whether an edit that did happen shows the label
+// is Telegram's call, carried separately in EditHidden - which is why the text
+// lands either way (#269).
 func (s *State) ApplyEdit(msg domain.Message) (Change, bool) {
-	if msg.EditDate == nil {
-		return s.ApplyReactions(msg.ChatID, msg.ID, msg.Reactions, msg.HasUnreadReactions)
+	s.st.UpdateMessageText(msg.ChatID, msg.ID, msg.Text, msg.Entities)
+	if msg.EditDate != nil {
+		s.st.MarkMessageEdited(msg.ChatID, msg.ID, *msg.EditDate, msg.EditHidden)
 	}
-	s.st.UpdateMessageText(msg.ChatID, msg.ID, msg.Text, msg.Entities, *msg.EditDate)
 	s.st.UpdateMessageReactions(msg.ChatID, msg.ID, msg.Reactions)
 	unreadChanged := false
 	if msg.HasUnreadReactions {
@@ -72,8 +67,8 @@ func (s *State) ApplyRestore(msg domain.Message) (Change, bool) {
 
 // ApplyEditRestore puts a message back as it was before an edit Telegram
 // refused, including clearing the EditDate the optimistic version stamped on.
-// ApplyEdit cannot do this: a message with no EditDate means "reactions only"
-// there, which is right for the update path and wrong for a rollback.
+// ApplyEdit cannot do this: it only ever sets the marker, because an update
+// that arrives without an edit date says nothing about one that did not.
 func (s *State) ApplyEditRestore(msg domain.Message) (Change, bool) {
 	s.st.ReplaceMessage(msg.ChatID, msg)
 	c := Change{Kind: ChangeMessageEdited, ChatID: msg.ChatID, Message: msg, MsgID: msg.ID}

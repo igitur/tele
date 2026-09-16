@@ -266,7 +266,12 @@ type Message struct {
 	GroupedID    int64
 	ReplyToMsgID int        // 0 if not a reply
 	EditDate     *time.Time // nil if not edited
-	Reactions    []Reaction
+	// EditHidden is Telegram's edit_hide: the message must be shown as
+	// unmodified even though it carries an edit date. It is a statement about
+	// the label alone and never about the content, which may well have changed
+	// under it - a bot streaming a reply rewrites one message this way (#269).
+	EditHidden bool
+	Reactions  []Reaction
 	// HasUnreadReactions is true when the raw message carried at least one recent
 	// reaction flagged unread (a not-yet-viewed reaction on one of our messages).
 	HasUnreadReactions bool
@@ -279,6 +284,12 @@ type Message struct {
 	// bubble a client draws for an outbox entry; nil for real messages.
 	LocalMedia *LocalMedia
 }
+
+// ShowsEdited reports whether the message carries the "edited" mark. Being
+// edited and being labelled as edited are two different facts: Telegram hides
+// the label on a reaction bump and on a bot rewriting its own message, and asks
+// every client to hide it the same way.
+func (m Message) ShowsEdited() bool { return m.EditDate != nil && !m.EditHidden }
 
 // LocalMedia describes the files of a queued media send so the pending bubble
 // can name them and show upload progress.

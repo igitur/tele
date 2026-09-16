@@ -11,6 +11,15 @@ Older releases are at <https://github.com/sorokin-vladimir/tele/releases>.
 
 ## [Unreleased]
 
+### Fixed
+
+- A message that a bot rewrites in place now updates on screen. Telegram marks
+  such an edit as one clients must show as unmodified, and tele read that as
+  "the text did not change", so a bot streaming a long answer left its opening
+  words on screen and nothing after them. Being edited and being labelled as
+  edited are now two separate facts: the new text always lands, and the "edited"
+  mark still stays off wherever Telegram asks for it.
+
 ## [1.11.5] - 2026-09-11
 
 ### Added
