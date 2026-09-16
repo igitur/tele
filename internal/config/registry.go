@@ -7,8 +7,13 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/sorokin-vladimir/tele/internal/proxy"
 	"github.com/sorokin-vladimir/tele/internal/settings"
 )
+
+// proxyPrefix marks the keys that are judged by internal/proxy rather than by
+// the machinery every other setting goes through.
+const proxyPrefix = "proxy."
 
 // registry declares every setting kept in the config file, in the order a
 // person meets them - the order of the file itself, so a row on screen and a
@@ -49,6 +54,63 @@ var registry = []settings.Entry{
 		Widget:   settings.Text,
 		Applies:  settings.Startup,
 		ReadOnly: true,
+	},
+	{
+		Key:     "proxy.type",
+		Group:   "proxy",
+		Label:   "Proxy",
+		Help:    "How tele reaches Telegram. auto leaves that to the ALL_PROXY environment variable, which is deprecated; direct puts nothing in between and ignores the variable; mtproto and socks5 use the proxy named below. Every connection takes it, media included.",
+		Widget:  settings.Choice,
+		Applies: settings.Startup,
+		Choices: proxy.Types(),
+	},
+	{
+		Key:     "proxy.server",
+		Group:   "proxy",
+		Label:   "Proxy server",
+		Help:    "The host the proxy answers on. Read by the mtproto and socks5 types; under any other type it is read by nothing, which tele says at launch rather than leaving you to believe it is in use.",
+		Widget:  settings.Text,
+		Applies: settings.Startup,
+	},
+	{
+		Key:   "proxy.port",
+		Group: "proxy",
+		Label: "Proxy port",
+		Help:  "The port the proxy answers on. Zero is not a port: it is what the file says when no proxy is configured, and a type that dials somebody is refused without a real one.",
+		// Zero is legal here and only here, because it is how absence is
+		// spelled for a number. What makes it legal in the file is not what
+		// makes it usable: proxy.Parse wants 1 to 65535 the moment the type
+		// names a proxy to dial.
+		Widget:  settings.Number,
+		Applies: settings.Startup,
+		Min:     0,
+		Max:     65535,
+	},
+	{
+		Key:     "proxy.secret",
+		Group:   "proxy",
+		Label:   "Proxy secret",
+		Help:    "What an mtproto proxy asks a client to prove it knows, written the way the proxy published it - hex or base64url, both are read. It is shown masked because it is a credential and this screen ends up in recordings.",
+		Widget:  settings.Text,
+		Applies: settings.Startup,
+		Secret:  true,
+	},
+	{
+		Key:     "proxy.username",
+		Group:   "proxy",
+		Label:   "Proxy username",
+		Help:    "Who tele says it is to a socks5 proxy that asks. A proxy is given a username and a password together or neither of them.",
+		Widget:  settings.Text,
+		Applies: settings.Startup,
+	},
+	{
+		Key:     "proxy.password",
+		Group:   "proxy",
+		Label:   "Proxy password",
+		Help:    "The password paired with the proxy username. Masked for the same reason the API hash is.",
+		Widget:  settings.Text,
+		Applies: settings.Startup,
+		Secret:  true,
 	},
 	{
 		Key: "state_dir",
@@ -237,6 +299,13 @@ func repairIllegal(v *viper.Viper) []Warning {
 	var warns []Warning
 	for _, e := range registry {
 		if e.ReadOnly {
+			continue
+		}
+		// The proxy section is not repaired. Repair puts an illegal value back
+		// to its default, and for a route that default is a direct connection
+		// to Telegram - the one outcome somebody writing this section is
+		// working to avoid. It refuses in Load instead (ADR 0017).
+		if strings.HasPrefix(e.Key, proxyPrefix) {
 			continue
 		}
 		err := e.Validate(v.Get(e.Key))

@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/sorokin-vladimir/tele/internal/proxy"
 	"github.com/sorokin-vladimir/tele/internal/settings"
 )
 
@@ -113,7 +114,12 @@ type AvatarsConfig struct {
 }
 
 type Config struct {
-	Telegram    TelegramConfig            `mapstructure:"telegram"`
+	Telegram TelegramConfig `mapstructure:"telegram"`
+	// Proxy is how tele reaches Telegram. Its type lives in internal/proxy
+	// together with what judges it: unlike every other section, an unreadable
+	// one stops the start rather than falling back to its default, and the
+	// reason is that its default is a direct connection (ADR 0017).
+	Proxy       proxy.Config              `mapstructure:"proxy"`
 	UI          UIConfig                  `mapstructure:"ui"`
 	Photos      PhotosConfig              `mapstructure:"photos"`
 	Avatars     AvatarsConfig             `mapstructure:"avatars"`
@@ -182,12 +188,40 @@ func Load(path, defaultStateDir string) (*Config, error) {
 		return nil, err
 	}
 	cfg.Warnings = append(cfg.Warnings, repairs...)
+	if err := cfg.resolveProxy(path); err != nil {
+		return nil, err
+	}
 	cfg.named = namedInFile(v)
 	cfg.resolveNotifications(v)
 	cfg.resolveState(defaultStateDir)
 	cfg.ThemesDir = filepath.Join(filepath.Dir(path), themesDirName)
 	cfg.resolveTheme()
 	return &cfg, nil
+}
+
+// resolveProxy is the one section that can stop a config from loading.
+//
+// Everything else in the file is repaired to its default and reported, because
+// one wrong key should not keep somebody out of their messages. A proxy cannot
+// be: the default it would fall back to is a direct connection to Telegram,
+// which is what the section was written to avoid, and the report would be one
+// warning line among the theme notices (ADR 0017).
+//
+// The message carries all three things its reader needs and fits on one line,
+// because it is read in two places: on a terminal by somebody whose tele did
+// not start, and in a toast by somebody whose reload was refused.
+func (c *Config) resolveProxy(path string) error {
+	if _, err := proxy.Parse(c.Proxy); err != nil {
+		return fmt.Errorf("%w (in %s; set proxy.type: direct to connect without a proxy)", err, path)
+	}
+	for _, n := range proxy.Notices(c.Proxy) {
+		if n.ID == "" {
+			c.warn("%s", n.Text)
+			continue
+		}
+		c.warnOnce(n.ID, "%s", n.Text)
+	}
+	return nil
 }
 
 // legacyThemeName is the value shipped in every config tele has ever written. It

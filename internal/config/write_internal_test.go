@@ -284,9 +284,12 @@ func TestEditFile_KeepsLFLineEndings(t *testing.T) {
 
 func TestSiblingOrder(t *testing.T) {
 	assert.Equal(t,
-		[]string{"telegram", "state_dir", "ui", "photos", "avatars", "keybindings"},
+		[]string{"telegram", "proxy", "state_dir", "ui", "photos", "avatars", "keybindings"},
 		siblingOrder(nil),
 		"the file's own order, exclusions included")
+	// The proxy section reads the way it is filled in: what kind of proxy,
+	// where it is, and then what it wants to be told.
+	assert.Equal(t, []string{"type", "server", "port", "secret", "username", "password"}, siblingOrder([]string{"proxy"}))
 	assert.Equal(t, []string{"history_limit", "theme", "notifications", "toasts", "date_format"}, siblingOrder([]string{"ui"}))
 	assert.Equal(t, []string{"desktop", "toast", "preview"}, siblingOrder([]string{"ui", "notifications"}))
 	assert.Equal(t, []string{"error_zone", "notify_zone", "max_visible"}, siblingOrder([]string{"ui", "toasts"}))
