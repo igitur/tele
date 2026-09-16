@@ -114,6 +114,11 @@ deprecated, last touched in 2022), `arigram` (archived), `tg-tui` (2018),
   selected GIF looping in place.
 - **Sending media** - attach a file with `u`; press it again to stage more and
   send them as one grouped album.
+- **Proxies, as in the official clients** - an MTProto proxy (server, port and
+  the secret a `tg://proxy` link carries, fake-TLS included) or a SOCKS5 one,
+  set in the config for `tele` alone rather than for your whole shell, and used
+  by every connection, downloads included:
+  [docs/configuration.md](docs/configuration.md#proxy)
 - **Terminal-native design** - built for terminal workflows, not adapted from a
   GUI client. Single static Go binary, fast startup, low memory.
 - **Simple configuration** - one YAML file with sensible defaults, and a

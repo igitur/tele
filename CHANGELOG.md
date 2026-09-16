@@ -11,6 +11,28 @@ Older releases are at <https://github.com/sorokin-vladimir/tele/releases>.
 
 ## [Unreleased]
 
+### Added
+
+- A `proxy` section in the config: an MTProto proxy - the kind a `tg://proxy` or
+  `t.me/proxy` link describes, plain, `dd` and fake-TLS `ee` secrets alike - or a
+  SOCKS5 one with a username and password. It applies to `tele` alone rather than
+  to every program in your shell, and every connection takes it, photos, voice
+  notes and file downloads included. See the Proxy section of
+  [docs/configuration.md](docs/configuration.md#proxy).
+- A proxy tele cannot read or cannot reach now stops the start and says which key
+  is wrong, in which file, and how to switch the proxy off on purpose. Every
+  other setting falls back to its default when it is wrong; a route does not,
+  because the value it would fall back to is a direct connection to Telegram -
+  the one thing the section was written to avoid.
+
+### Deprecated
+
+- The `ALL_PROXY` environment variable. It is still read when `proxy.type` is
+  `auto`, which is what an untouched config says, so nothing changes for you
+  today; tele now says once at launch that it is in use. Move it into the
+  `proxy` section, where it applies to tele alone and can describe an MTProto
+  proxy as well.
+
 ## [1.11.6] - 2026-09-16
 
 ### Fixed

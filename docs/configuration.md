@@ -30,6 +30,14 @@ they are a deliberate edit to the file rather than a keystroke.
 ## config.yml
 
 ```yaml
+# proxy: # how tele reaches Telegram; absent means auto
+#   type: mtproto # auto | direct | mtproto | socks5
+#   server: 127.0.0.1
+#   port: 1443
+#   secret: ee... # mtproto only, hex or base64url
+#   username: "" # socks5 only
+#   password: "" # socks5 only
+
 # state_dir: ~/.local/state/tele # session, local database and instance lock
 
 ui:
@@ -59,6 +67,97 @@ avatars:
   disk_cache_size: 16777216 # 16 MB of people's pictures, budgeted separately
 
 # keybindings: see keybindings.md
+```
+
+## Proxy
+
+`proxy` is how `tele` reaches Telegram's data centres. Every connection takes it:
+messages, photos, voice notes, files, whichever data centre they come from. The
+section is read at startup, so a change takes hold on `[restart]`.
+
+`proxy.type` says which route, and it takes four values:
+
+| `type`   | what it does                                                  |
+| -------- | ------------------------------------------------------------- |
+| `auto`   | the default: whatever `ALL_PROXY` says, direct if it says nothing |
+| `direct` | no proxy, and `ALL_PROXY` is ignored                          |
+| `mtproto`| an MTProto proxy - `server`, `port` and `secret`               |
+| `socks5` | a SOCKS5 proxy - `server`, `port`, and `username`/`password` if it asks |
+
+An MTProto proxy is the kind the official clients take from a `tg://proxy` or
+`t.me/proxy` link, including local bridges that expose one on `127.0.0.1`. Write
+the `secret` the way the proxy published it: hex or base64url, both are read, and
+all three kinds work - a bare secret, a `dd` one, and an `ee` one that disguises
+the connection as ordinary web traffic to the domain the secret carries.
+
+```yaml
+proxy:
+  type: mtproto
+  server: 127.0.0.1
+  port: 1443
+  secret: ee0123456789abcdef0123456789abcdef6578616d706c652e636f6d
+```
+
+Copy the secret whole, without picking it apart: in hex the `ee` prefix and the
+cloak domain are part of the same string (the tail above is `example.com`), and
+in base64url the whole thing is one word.
+
+A SOCKS5 proxy that asks who is calling gets `username` and `password` together;
+one without the other is refused, because half a login is a connection that is
+turned away with no reason given.
+
+```yaml
+proxy:
+  type: socks5
+  server: 10.0.0.1
+  port: 1080
+  username: me
+  password: hunter2
+```
+
+Values belonging to another type are left alone and reported at launch - a
+`secret` under `socks5` is not used, and `tele` says so rather than letting you
+believe it is.
+
+### When the proxy does not work
+
+A proxy section `tele` cannot read stops the start, with a message naming the
+key, the file it is in, and the one edit that connects without a proxy:
+
+```text
+config: proxy.secret is neither hex nor base64url; it is what a proxy publishes,
+copied whole (in ~/.config/tele/config.yml; set proxy.type: direct to connect
+without a proxy)
+```
+
+A proxy that nobody answers on stops the start the same way, after one dial with
+a short timeout. Both happen before the interface is drawn, on purpose: every
+other setting in this file is repaired to its default and reported as a warning,
+but the default for a route is a direct connection to Telegram, and a typo in a
+secret must not quietly send your traffic where the proxy was there to avoid
+sending it.
+
+A wrong secret or wrong credentials cannot be told apart from an unreachable
+server until Telegram answers, so those surface as ordinary connection failures
+once `tele` is running.
+
+### ALL_PROXY
+
+Before this section existed, `tele` read the `ALL_PROXY` environment variable,
+and it still does when `proxy.type` is `auto`. Only `socks5://` URLs are read
+from it - an `http://` proxy there is ignored, silently by everything else and
+with a warning by `tele`.
+
+The variable is deprecated and will be removed. It applies to every program
+started from that shell rather than to `tele` alone, it cannot describe an
+MTProto proxy, and it does not show up in the settings overlay. Move it into the
+config:
+
+```yaml
+proxy:
+  type: socks5
+  server: 127.0.0.1
+  port: 1080
 ```
 
 ## State directory
