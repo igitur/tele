@@ -17,6 +17,11 @@ type fakeUpdatesAPI struct {
 	diff tg.UpdatesChannelDifferenceClass
 	err  error
 	req  *tg.UpdatesGetChannelDifferenceRequest
+
+	// commonDiff answers the common-state difference call, for the tests about
+	// that half. Unset means an account with nothing pending.
+	commonDiff tg.UpdatesDifferenceClass
+	commonErr  error
 }
 
 func (f *fakeUpdatesAPI) UpdatesGetState(context.Context) (*tg.UpdatesState, error) {
@@ -26,7 +31,13 @@ func (f *fakeUpdatesAPI) UpdatesGetState(context.Context) (*tg.UpdatesState, err
 func (f *fakeUpdatesAPI) UpdatesGetDifference(
 	context.Context, *tg.UpdatesGetDifferenceRequest,
 ) (tg.UpdatesDifferenceClass, error) {
-	return &tg.UpdatesDifferenceEmpty{}, nil
+	if f.commonErr != nil {
+		return nil, f.commonErr
+	}
+	if f.commonDiff == nil {
+		return &tg.UpdatesDifferenceEmpty{}, nil
+	}
+	return f.commonDiff, nil
 }
 
 func (f *fakeUpdatesAPI) UpdatesGetChannelDifference(

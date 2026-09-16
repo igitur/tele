@@ -19,6 +19,14 @@ Older releases are at <https://github.com/sorokin-vladimir/tele/releases>.
   words on screen and nothing after them. Being edited and being labelled as
   edited are now two separate facts: the new text always lands, and the "edited"
   mark still stays off wherever Telegram asks for it.
+- A message no longer sticks at an old version after a hiccup in the update
+  stream. When events go missing, tele asks Telegram what it missed, and the
+  answer was being fed back through the very queue the hiccup had jammed: the
+  account caught up, the counters agreed, and the changes themselves were thrown
+  away. A message rewritten while that was happening kept whatever it said
+  beforehand, which is most visible with a bot that streams its reply. What the
+  catch-up brings back is now applied directly, and a change that arrives twice
+  or out of order is recognised and ignored rather than undoing a newer one.
 
 ## [1.11.5] - 2026-09-11
 

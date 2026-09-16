@@ -272,7 +272,12 @@ func (c *GotdClient) Connect(ctx context.Context, cfg *config.Config, af *AuthFl
 		c.api = tc.API()
 		c.mu.Unlock()
 
-		return manager.Run(ctx, newChannelDiffAPI(tc.API(), c.log), self.ID, updates.AuthOptions{
+		// Two wrappers over the same API, one per defect in the manager's gap
+		// handling: the channel difference carries a cooldown that must not be
+		// obeyed (#266), and a common difference carries updates the manager
+		// then drops (#267). Each dies on its own when its upstream fix ships.
+		diffAPI := newCommonDiffAPI(newChannelDiffAPI(tc.API(), c.log), dispatcher, c.log)
+		return manager.Run(ctx, diffAPI, self.ID, updates.AuthOptions{
 			OnStart: func(ctx context.Context) {
 				c.log.Debug("updates manager started, signalling ready")
 				close(readyCh)
