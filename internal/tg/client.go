@@ -2,13 +2,11 @@ package tg
 
 import (
 	"context"
-	"net"
 	"os"
 	"sync"
 
 	"github.com/gotd/log/logzap"
 	"go.uber.org/zap"
-	"golang.org/x/net/proxy"
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
@@ -37,13 +35,17 @@ type GotdClient struct {
 	suppressMu   sync.Mutex
 	suppressIDs  map[int]struct{}
 	stateStorage updates.StateStorage
+	// resolver is how this client reaches Telegram: directly, or through the
+	// proxy the config named. Handed in rather than built here, because a proxy
+	// that cannot be reached has to stop the start before anything is drawn.
+	resolver dcs.Resolver
 	// senderNames remembers userID -> display name across updates and history
 	// fetches so a live update that omits the sender's entity still resolves the
 	// author instead of rendering "?" (#161).
 	senderNames *nameCache
 }
 
-func NewGotdClient(log *zap.Logger, stateStorage updates.StateStorage, trace bool) *GotdClient {
+func NewGotdClient(log *zap.Logger, stateStorage updates.StateStorage, trace bool, resolver dcs.Resolver) *GotdClient {
 	traceLog := zap.NewNop()
 	if trace {
 		traceLog = log
@@ -57,6 +59,7 @@ func NewGotdClient(log *zap.Logger, stateStorage updates.StateStorage, trace boo
 		traceLog:     traceLog,
 		suppressIDs:  make(map[int]struct{}),
 		stateStorage: stateStorage,
+		resolver:     resolver,
 		senderNames:  newNameCache(),
 	}
 }
@@ -199,25 +202,16 @@ func (c *GotdClient) Connect(ctx context.Context, cfg *config.Config, af *AuthFl
 		}
 	}()
 
-	dialer := proxy.FromEnvironment()
-	if dialer != proxy.Direct {
-		c.log.Info("using system proxy from ALL_PROXY")
-	}
-	resolver := dcs.Plain(dcs.PlainOptions{
-		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			if cd, ok := dialer.(proxy.ContextDialer); ok {
-				return cd.DialContext(ctx, network, addr)
-			}
-			return dialer.Dial(network, addr)
-		},
-	})
-
 	c.log.Info("gotd client", zap.String("gotd", gotdVersion()))
 
 	tc := telegram.NewClient(cfg.Telegram.APIID, cfg.Telegram.APIHash, telegram.Options{
 		UpdateHandler:  hook,
 		SessionStorage: sess,
-		Resolver:       resolver,
+		// One resolver for every data centre this client ever reaches, so a
+		// photo from a media DC takes the same route as the message it came
+		// with. It is built before the interface exists, from the proxy section
+		// of the config (ADR 0017).
+		Resolver: c.resolver,
 		// The "v" field carries the application version on every line, so gotd's
 		// own stamp of the same name is dropped and reported once above instead.
 		Logger: logzap.New(withoutField(c.log, "v")),
