@@ -11,6 +11,8 @@ Older releases are at <https://github.com/sorokin-vladimir/tele/releases>.
 
 ## [Unreleased]
 
+## [1.11.7] - 2026-09-16
+
 ### Added
 
 - A `proxy` section in the config: an MTProto proxy - the kind a `tg://proxy` or
