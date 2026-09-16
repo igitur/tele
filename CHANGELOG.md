@@ -11,6 +11,8 @@ Older releases are at <https://github.com/sorokin-vladimir/tele/releases>.
 
 ## [Unreleased]
 
+## [1.11.6] - 2026-09-16
+
 ### Fixed
 
 - A message that a bot rewrites in place now updates on screen. Telegram marks
