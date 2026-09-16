@@ -8,8 +8,21 @@ import (
 // ApplyIncoming records a newly received message. The second result reports
 // whether the client needs to hear about it at all; Change.UnreadChanged
 // separately reports whether a counter moved.
+//
+// A message already held is a second delivery of one arrival, which is ordinary
+// traffic under at-least-once delivery (ADR 0016), and an arrival happens once.
+// Position refuses it before anything is written, which also keeps a recovered
+// copy of the original from overwriting the edits that followed it. A copy with
+// no position is caught after the fact instead, by the store reporting that it
+// held the message already.
 func (s *State) ApplyIncoming(msg domain.Message) (Change, bool) {
-	unreadChanged := store.ApplyIncomingMessage(s.st, msg)
+	if !s.st.AdvanceAppliedPosition(msg.ChatID, msg.ID, msg.AppliedPosition) {
+		return Change{}, false
+	}
+	isNew, unreadChanged := store.ApplyIncomingMessage(s.st, msg)
+	if !isNew {
+		return Change{}, false
+	}
 	c := Change{
 		Kind:          ChangeNewMessage,
 		ChatID:        msg.ChatID,
@@ -34,7 +47,14 @@ func (s *State) ApplyIncoming(msg domain.Message) (Change, bool) {
 // message to "edited" (#118). Whether an edit that did happen shows the label
 // is Telegram's call, carried separately in EditHidden - which is why the text
 // lands either way (#269).
+//
+// An edit at or behind the position the message has already applied is a late
+// copy of a change that has already happened. It writes nothing and reports
+// nothing, so a newer text can never be replaced by an older one (ADR 0016).
 func (s *State) ApplyEdit(msg domain.Message) (Change, bool) {
+	if !s.st.AdvanceAppliedPosition(msg.ChatID, msg.ID, msg.AppliedPosition) {
+		return Change{}, false
+	}
 	s.st.UpdateMessageText(msg.ChatID, msg.ID, msg.Text, msg.Entities)
 	if msg.EditDate != nil {
 		s.st.MarkMessageEdited(msg.ChatID, msg.ID, *msg.EditDate, msg.EditHidden)

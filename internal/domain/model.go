@@ -271,7 +271,14 @@ type Message struct {
 	// the label alone and never about the content, which may well have changed
 	// under it - a bot streaming a reply rewrites one message this way (#269).
 	EditHidden bool
-	Reactions  []Reaction
+	// AppliedPosition is how far through the account's events this copy of the
+	// message has been brought. On a copy that arrives it is the position of the
+	// update carrying it; on a stored copy it is the last one applied, which is
+	// what makes a late copy recognisable as late. Zero means the source carries
+	// no position at all - a fetched history page, or our own edit before the
+	// server answers - and orders against nothing (ADR 0016).
+	AppliedPosition int
+	Reactions       []Reaction
 	// HasUnreadReactions is true when the raw message carried at least one recent
 	// reaction flagged unread (a not-yet-viewed reaction on one of our messages).
 	HasUnreadReactions bool

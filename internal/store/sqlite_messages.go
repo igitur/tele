@@ -371,7 +371,7 @@ func (s *SQLiteStore) BumpChatLastMessage(chatID int64, msg domain.Message) {
 // carry more (a resolved sender name, filled-in media refs), so it wins in place
 // rather than appearing a second time. Sentinel IDs are negative and unique, so
 // optimistic messages never collide here.
-func (s *SQLiteStore) AppendMessage(msg domain.Message) {
+func (s *SQLiteStore) AppendMessage(msg domain.Message) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if msg.ID > 0 {
@@ -379,7 +379,7 @@ func (s *SQLiteStore) AppendMessage(msg domain.Message) {
 			if s.messages[msg.ChatID][i].ID == msg.ID {
 				s.messages[msg.ChatID][i] = msg
 				s.markMsgDirtyLocked(msg.ChatID, msg.ID)
-				return
+				return false
 			}
 		}
 	}
@@ -401,6 +401,28 @@ func (s *SQLiteStore) AppendMessage(msg domain.Message) {
 		s.markDirtyLocked(msg.ChatID) // write-behind: last-message persists on flush
 	}
 	s.capMessagesLocked(msg.ChatID)
+	return true
+}
+
+// AdvanceAppliedPosition compares and records under one lock, so the decision
+// and the record cannot disagree.
+func (s *SQLiteStore) AdvanceAppliedPosition(chatID int64, msgID, position int) bool {
+	if position == 0 {
+		return true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.messages[chatID] {
+		if s.messages[chatID][i].ID == msgID {
+			if position <= s.messages[chatID][i].AppliedPosition {
+				return false
+			}
+			s.messages[chatID][i].AppliedPosition = position
+			s.markMsgDirtyLocked(chatID, msgID)
+			return true
+		}
+	}
+	return true
 }
 
 // UpdateMessageText replaces a message's text and its entities together. They
@@ -414,10 +436,25 @@ func (s *SQLiteStore) UpdateMessageText(chatID int64, msgID int, text string, en
 	defer s.mu.Unlock()
 	for i := range s.messages[chatID] {
 		if s.messages[chatID][i].ID == msgID {
-			s.messages[chatID][i].Text = text
+			m := &s.messages[chatID][i]
+			// A caption can legitimately be removed, and a broken delivery looks
+			// exactly the same from here. Rather than guess, say so and carry on:
+			// the counts and the position are enough to tell the two apart in a
+			// log, and the text itself never goes into one (#80).
+			if text == "" && m.Text != "" {
+				s.log.Warn("stored text replaced by an empty one",
+					zap.Int64("chat_id", chatID),
+					zap.Int("msg_id", msgID),
+					zap.Int("was_len", len([]rune(m.Text))),
+					zap.Int("now_len", 0),
+					zap.Bool("media", m.Media != nil || m.Photo != nil || m.Document != nil),
+					zap.Int("position", m.AppliedPosition),
+				)
+			}
+			m.Text = text
 			cp := make([]domain.MessageEntity, len(entities))
 			copy(cp, entities)
-			s.messages[chatID][i].Entities = cp
+			m.Entities = cp
 			s.markMsgDirtyLocked(chatID, msgID)
 			return
 		}

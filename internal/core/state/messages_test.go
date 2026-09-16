@@ -47,6 +47,24 @@ func TestApplyIncoming_ReadElsewhereReportsNoUnreadChange(t *testing.T) {
 	require.Len(t, st.Messages(1), 1)
 }
 
+// The same message can be delivered twice: the wire and a recovered difference
+// both carry it. The second copy is not news, and anything that fires once per
+// arrival must not fire again (ADR 0016).
+func TestApplyIncoming_SecondCopyIsNotNews(t *testing.T) {
+	s, st := newState(t)
+	st.SetChat(domain.Chat{ID: 1, Title: "A"})
+	msg := domain.Message{ID: 5, ChatID: 1, Text: "hi"}
+
+	_, ok := s.ApplyIncoming(msg)
+	require.True(t, ok)
+
+	_, ok = s.ApplyIncoming(msg)
+	assert.False(t, ok, "the client already heard about this one")
+	require.Len(t, st.Messages(1), 1, "and it is stored once")
+	c, _ := st.GetChat(1)
+	assert.Equal(t, 1, c.UnreadCount, "the counter did not move twice")
+}
+
 func TestApplyIncoming_OutgoingDoesNotCount(t *testing.T) {
 	s, st := newState(t)
 	st.SetChat(domain.Chat{ID: 1})
@@ -117,6 +135,67 @@ func TestApplyEdit_HiddenEditUpdatesTheText(t *testing.T) {
 	assert.Equal(t, "the whole answer", got.Text)
 	assert.NotNil(t, got.EditDate, "the edit happened and the time is recorded")
 	assert.False(t, got.ShowsEdited(), "Telegram asked for no label on this one")
+}
+
+// Delivery is at least once, so the same edit can arrive twice and a late copy
+// can arrive after a newer one. Position is what separates them: an edit at or
+// behind what the message has already applied changes nothing and tells the
+// client nothing (ADR 0016).
+func TestApplyEdit_LateCopyOfAnEditIsRefused(t *testing.T) {
+	s, st := newState(t)
+	st.SetChat(domain.Chat{ID: 1})
+	st.AppendMessage(domain.Message{ID: 5, ChatID: 1, Text: "first"})
+	when := time.Now()
+
+	_, ok := s.ApplyEdit(domain.Message{
+		ID: 5, ChatID: 1, Text: "second", EditDate: &when, AppliedPosition: 20,
+	})
+	require.True(t, ok)
+
+	// The same one again, and then one from before it.
+	_, ok = s.ApplyEdit(domain.Message{
+		ID: 5, ChatID: 1, Text: "second", EditDate: &when, AppliedPosition: 20,
+	})
+	assert.False(t, ok, "a duplicate changes nothing")
+
+	_, ok = s.ApplyEdit(domain.Message{
+		ID: 5, ChatID: 1, Text: "stale", EditDate: &when, AppliedPosition: 19,
+	})
+	assert.False(t, ok, "a copy from before the stored one changes nothing")
+	assert.Equal(t, "second", st.Messages(1)[0].Text, "the newer text stands")
+
+	// And the stream carries on from where it was.
+	_, ok = s.ApplyEdit(domain.Message{
+		ID: 5, ChatID: 1, Text: "third", EditDate: &when, AppliedPosition: 21,
+	})
+	require.True(t, ok)
+	assert.Equal(t, "third", st.Messages(1)[0].Text)
+}
+
+// Not every source carries a position: our own optimistic edit has none until
+// the server answers, and a refetched history page has none at all. They apply
+// unconditionally and leave the stored position alone.
+func TestApplyEdit_WithoutAPositionAlwaysApplies(t *testing.T) {
+	s, st := newState(t)
+	st.SetChat(domain.Chat{ID: 1})
+	st.AppendMessage(domain.Message{ID: 5, ChatID: 1, Text: "first"})
+	when := time.Now()
+
+	_, ok := s.ApplyEdit(domain.Message{
+		ID: 5, ChatID: 1, Text: "second", EditDate: &when, AppliedPosition: 20,
+	})
+	require.True(t, ok)
+
+	_, ok = s.ApplyEdit(domain.Message{ID: 5, ChatID: 1, Text: "from a page", EditDate: &when})
+	require.True(t, ok, "a copy with no position is not a late copy")
+	assert.Equal(t, "from a page", st.Messages(1)[0].Text)
+
+	// The recorded position did not move, so the stream still picks up at 21.
+	_, ok = s.ApplyEdit(domain.Message{
+		ID: 5, ChatID: 1, Text: "third", EditDate: &when, AppliedPosition: 21,
+	})
+	require.True(t, ok)
+	assert.Equal(t, "third", st.Messages(1)[0].Text)
 }
 
 // Telegram delivers a 1:1 peer reaction as a hidden edit carrying the message's

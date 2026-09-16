@@ -176,6 +176,24 @@ func TestNotify_OneEventFeedsBothSinks(t *testing.T) {
 	}
 }
 
+// Delivery is at least once, so the wire and a recovered difference can both
+// carry the same message. Only the first is an arrival: the second must ring
+// nothing and flash nothing (ADR 0016).
+func TestNotify_SecondCopyOfAMessageIsSilent(t *testing.T) {
+	n := &mockNotifier{}
+	o, st := newTestOwnerNotified(t, n)
+	st.SetChat(domain.Chat{ID: 2, Title: "Bob"})
+	evt := store.Event{Kind: store.EventNewMessage,
+		Message: domain.Message{ID: 40, ChatID: 2, Text: "hello there", Date: time.Now()}}
+
+	o.handleEvent(evt)
+	o.handleEvent(evt)
+
+	assert.Len(t, n.calls, 1, "one arrival, one banner")
+	assert.Equal(t, 1, len(o.Notifications()), "one toast")
+	assert.Equal(t, 1, len(o.Incoming()), "one row flash")
+}
+
 // The two gates are different on purpose: mute silences the interruption but
 // must not suppress the row flash that follows the reorder (#39).
 func TestNotify_MutedChatStillFlashesTheRow(t *testing.T) {

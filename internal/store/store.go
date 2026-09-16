@@ -45,7 +45,16 @@ type Store interface {
 	// LoadMessages loads a chat's persisted message tail into memory on first
 	// open (idempotent per chat). See issue #139.
 	LoadMessages(chatID int64)
-	AppendMessage(msg domain.Message)
+	// AppendMessage stores an arriving message, replacing the stored copy when
+	// the same id is already held. It reports whether the message was new, which
+	// is how a second delivery of one arrival is told from a first.
+	AppendMessage(msg domain.Message) bool
+	// AdvanceAppliedPosition records that a change at this position has been
+	// applied to a message, reporting false when the stored copy has already
+	// applied that position or a later one. A zero position orders against
+	// nothing: it passes and records nothing. So does an unknown message, which
+	// has applied nothing at all (ADR 0016).
+	AdvanceAppliedPosition(chatID int64, msgID int, position int) bool
 	// BumpChatLastMessage updates a chat's last-message preview and ordering
 	// without appending to its message slice (e.g. a forward target).
 	BumpChatLastMessage(chatID int64, msg domain.Message)

@@ -44,12 +44,13 @@ func setupDispatcher(
 	// emits a store.EventNewMessage. It is shared by the UpdateNewMessage
 	// (users/basic groups) and UpdateNewChannelMessage (channels/supergroups)
 	// handlers, which carry an identically shaped Message field.
-	handleNewMessage := func(ctx context.Context, e tg.Entities, raw tg.MessageClass) error {
+	handleNewMessage := func(ctx context.Context, e tg.Entities, raw tg.MessageClass, pts int) error {
 		peerID := extractPeerID(raw)
 		msg, ok := convertMessage(raw, peerID)
 		if !ok {
 			return nil
 		}
+		msg.AppliedPosition = pts
 		// Seed the name cache from every user entity this update carries, so a
 		// later update that omits a sender's User can still resolve the name (#161).
 		for id, user := range e.Users {
@@ -120,26 +121,31 @@ func setupDispatcher(
 	}
 
 	dispatcher.OnNewMessage(func(ctx context.Context, e tg.Entities, upd *tg.UpdateNewMessage) error {
-		return handleNewMessage(ctx, e, upd.Message)
+		return handleNewMessage(ctx, e, upd.Message, upd.Pts)
 	})
 
 	// UpdateNewChannelMessage covers channels and supergroups; UpdateNewMessage
 	// does not. Without this the chat list never bumps or increments unread for
 	// supergroup/channel messages during live updates (issue #116).
 	dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, upd *tg.UpdateNewChannelMessage) error {
-		return handleNewMessage(ctx, e, upd.Message)
+		return handleNewMessage(ctx, e, upd.Message, upd.Pts)
 	})
 
 	// handleEditMessage converts an edited message and emits EventEditMessage.
 	// Shared by UpdateEditMessage (users/basic groups) and UpdateEditChannelMessage
 	// (channels/supergroups). No sender-name enrichment: an edit only changes the
 	// message body, and the chat view re-renders from the already-stored sender.
-	handleEditMessage := func(ctx context.Context, raw tg.MessageClass) error {
+	//
+	// pts is what orders one copy of a change against another. A message belongs
+	// to one peer and a peer to one sequence, so the two update types never mix
+	// their counters on the same message (ADR 0016).
+	handleEditMessage := func(ctx context.Context, raw tg.MessageClass, pts int) error {
 		peerID := extractPeerID(raw)
 		msg, ok := convertMessage(raw, peerID)
 		if !ok {
 			return nil
 		}
+		msg.AppliedPosition = pts
 		log.Debug("dispatcher: edit message",
 			zap.Int64("chat_id", msg.ChatID), zap.Int("msg_id", msg.ID))
 		evt := store.Event{Kind: store.EventEditMessage, Message: msg}
@@ -156,11 +162,11 @@ func setupDispatcher(
 	}
 
 	dispatcher.OnEditMessage(func(ctx context.Context, e tg.Entities, upd *tg.UpdateEditMessage) error {
-		return handleEditMessage(ctx, upd.Message)
+		return handleEditMessage(ctx, upd.Message, upd.Pts)
 	})
 
 	dispatcher.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, upd *tg.UpdateEditChannelMessage) error {
-		return handleEditMessage(ctx, upd.Message)
+		return handleEditMessage(ctx, upd.Message, upd.Pts)
 	})
 
 	dispatcher.OnReadHistoryInbox(func(ctx context.Context, e tg.Entities, upd *tg.UpdateReadHistoryInbox) error {

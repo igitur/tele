@@ -59,7 +59,15 @@ func (o *Owner) handleEvent(evt store.Event) {
 
 	// Applying commits, and the owner's commit listener publishes the resulting
 	// deltas. Nothing is forwarded from here.
-	state.Apply(o.state, evt)
+	//
+	// What follows an event follows from the change it made, not from its
+	// arrival. Delivery is at least once, so the same event can be applied twice
+	// and the second time changes nothing: no banner, no toast, no row flash
+	// (ADR 0016). The notification is still decided once, from one snapshot, and
+	// both sinks still get the same value (#192, ADR 0013).
+	if _, changed := state.Apply(o.state, evt); !changed {
+		return
+	}
 
 	focused := o.focus.focused
 	now := time.Now()

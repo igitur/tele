@@ -10,6 +10,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMemory_AppendMessage_ReportsWhetherItWasNew(t *testing.T) {
+	s := store.NewMemory()
+	msg := domain.Message{ID: 1, ChatID: 5, Text: "hi"}
+
+	assert.True(t, s.AppendMessage(msg), "the first copy is new")
+	assert.False(t, s.AppendMessage(msg), "the second is the same message again")
+	assert.Len(t, s.Messages(5), 1)
+}
+
+// A pending bubble has no id yet, so two of them are two different sends rather
+// than one message arriving twice.
+func TestMemory_AppendMessage_UnnumberedIsAlwaysNew(t *testing.T) {
+	s := store.NewMemory()
+	assert.True(t, s.AppendMessage(domain.Message{ChatID: 5, Text: "one"}))
+	assert.True(t, s.AppendMessage(domain.Message{ChatID: 5, Text: "two"}))
+	assert.Len(t, s.Messages(5), 2)
+}
+
+func TestMemory_AdvanceAppliedPosition(t *testing.T) {
+	s := store.NewMemory()
+	s.AppendMessage(domain.Message{ID: 1, ChatID: 5, Text: "hi"})
+
+	assert.True(t, s.AdvanceAppliedPosition(5, 1, 20), "nothing has been applied yet")
+	assert.False(t, s.AdvanceAppliedPosition(5, 1, 20), "that one has been applied")
+	assert.False(t, s.AdvanceAppliedPosition(5, 1, 19), "and so has a later one")
+	assert.True(t, s.AdvanceAppliedPosition(5, 1, 21))
+	assert.Equal(t, 21, s.Messages(5)[0].AppliedPosition)
+}
+
+// A change from a source with no position cannot be ordered against anything,
+// so it passes and records nothing.
+func TestMemory_AdvanceAppliedPosition_ZeroPasses(t *testing.T) {
+	s := store.NewMemory()
+	s.AppendMessage(domain.Message{ID: 1, ChatID: 5, Text: "hi"})
+	require.True(t, s.AdvanceAppliedPosition(5, 1, 20))
+
+	assert.True(t, s.AdvanceAppliedPosition(5, 1, 0))
+	assert.Equal(t, 20, s.Messages(5)[0].AppliedPosition, "and leaves the position where it was")
+}
+
+func TestMemory_AdvanceAppliedPosition_UnknownMessagePasses(t *testing.T) {
+	s := store.NewMemory()
+	assert.True(t, s.AdvanceAppliedPosition(5, 404, 20),
+		"a message we do not hold has applied nothing, so nothing is out of order")
+}
+
 func TestMemory_UpdateMessageMedia(t *testing.T) {
 	s := store.NewMemory()
 	s.SetMessages(7, []domain.Message{
