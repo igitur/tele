@@ -27,6 +27,7 @@ rebind works there only if it uses `ctrl` or `alt`.
 | `k` / `↑`           | Previous chat              |
 | `G`                 | Last chat                  |
 | `Ctrl+D` / `Ctrl+U` | Scroll half-page down / up |
+| `PgDn` / `PgUp`     | Scroll page down / up      |
 | `Enter`             | Open chat, or a forum's topic list |
 | `/`                 | Search chats               |
 | `P`                 | Profile of the person (private chats only) |
@@ -50,6 +51,8 @@ move through them.
 | `k`       | Select previous (older) message|
 | `Ctrl+J` / `↓` | Scroll down               |
 | `Ctrl+K` / `↑` | Scroll up                 |
+| `Ctrl+D` / `Ctrl+U` | Scroll half-page down / up |
+| `PgDn` / `PgUp` | Scroll page down / up      |
 | `gg`      | Scroll to top                  |
 | `G`       | Scroll to bottom               |
 | `i` / `a` | Compose message (insert mode)  |
@@ -164,6 +167,8 @@ These are the action names usable as YAML keys in the `keybindings:` section
 | `go_bottom`        | Jump to the bottom (last / newest)   |
 | `scroll_half_down` | Scroll half a page down              |
 | `scroll_half_up`   | Scroll half a page up                |
+| `scroll_page_down` | Scroll a full page down              |
+| `scroll_page_up`   | Scroll a full page up                |
 | `cursor_down`      | Move the active-message cursor to the next (newer) bubble |
 | `cursor_up`        | Move the active-message cursor to the previous (older) bubble |
 | `confirm`          | Confirm / open the selected item     |
@@ -243,7 +248,7 @@ These are the action names usable as YAML keys in the `keybindings:` section
 
 > Key tokens use the terminal names: letters/digits as-is (`r`, `G`, `2`),
 > modifiers like `ctrl+d`, and named keys `enter`, `esc`, `space`, `up`, `down`,
-> `left`, `right`.
+> `left`, `right`, `pgup`, `pgdown`.
 
 > **Keyboard layout:** letter bindings also fire on the **same physical key**
 > under a Russian (ЙЦУКЕН) layout - e.g. `r`/Reply works whether the key types

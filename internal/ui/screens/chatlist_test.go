@@ -481,6 +481,37 @@ func TestChatListModel_ScrollInfo(t *testing.T) {
 	assert.Equal(t, 15, info.Offset, "cursor at bottom => start = 20-5")
 }
 
+func TestChatList_PageDown_MovesByViewport(t *testing.T) {
+	m := screens.NewChatListModel()
+	m.SetSize(20, 5) // 5 visible rows
+	chats := make([]domain.Chat, 20)
+	for i := range chats {
+		chats[i] = domain.Chat{ID: int64(i + 1), Title: "c"}
+	}
+	setChats(m, chats)
+
+	newPane, _ := m.Update(keys.ActionMsg{Action: keys.ActionPageDown})
+	m = newPane.(*screens.ChatListModel)
+	assert.Equal(t, 5, m.Cursor(), "a page moves the cursor by one viewport")
+
+	newPane, _ = m.Update(keys.ActionMsg{Action: keys.ActionPageUp})
+	m = newPane.(*screens.ChatListModel)
+	assert.Equal(t, 0, m.Cursor())
+}
+
+func TestChatList_PageDown_ClampsAtEnd(t *testing.T) {
+	m := screens.NewChatListModel()
+	m.SetSize(20, 5)
+	setChats(m, makeTestChats()) // 3 chats, one page covers them
+	newPane, _ := m.Update(keys.ActionMsg{Action: keys.ActionPageDown})
+	m = newPane.(*screens.ChatListModel)
+	assert.Equal(t, 2, m.Cursor(), "page down cannot move past the last chat")
+
+	newPane, _ = m.Update(keys.ActionMsg{Action: keys.ActionPageUp})
+	m = newPane.(*screens.ChatListModel)
+	assert.Equal(t, 0, m.Cursor())
+}
+
 func TestChatIndexAtViewportRow_NoScroll(t *testing.T) {
 	m := screens.NewChatListModel()
 	m.SetSize(20, 10)

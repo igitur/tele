@@ -23,6 +23,8 @@ Older releases are at <https://github.com/sorokin-vladimir/tele/releases>.
   directory, the proxy, the cache sizes, the image mode and the app key - keep
   the values it started with for whoever logs in next, whatever the config
   says by then (#239).
+- `PgUp` / `PgDn` scroll a full page in the chat and the chat list. `Ctrl+U` /
+  `Ctrl+D` keep their half-page jump.
 
 ### Changed
 

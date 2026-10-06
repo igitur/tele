@@ -555,6 +555,19 @@ func (m *ChatModel) Title() string {
 
 func (m *ChatModel) Init() tea.Cmd { return m.composer.Init() }
 
+// loadMoreAtTop asks for older history when the viewport has reached the oldest
+// loaded message, or returns nil when there is nothing to prefetch. Every
+// upward scroll ends with this, so paging up past the loaded window keeps
+// working.
+func (m *ChatModel) loadMoreAtTop() tea.Cmd {
+	if m.header.ChatID == 0 || m.msgList.Count() == 0 {
+		return nil
+	}
+	chatID := m.header.ChatID
+	offsetID := m.msgList.OldestID()
+	return func() tea.Msg { return LoadMoreMsg{ChatID: chatID, OffsetID: offsetID} }
+}
+
 func (m *ChatModel) Update(msg tea.Msg) (layout.Pane, tea.Cmd) {
 	switch msg := msg.(type) {
 	case keys.ActionMsg:
@@ -583,18 +596,12 @@ func (m *ChatModel) Update(msg tea.Msg) (layout.Pane, tea.Cmd) {
 		case keys.ActionUp:
 			atTop := m.msgList.AtTop()
 			m.msgList.ScrollUp()
-			if atTop && m.header.ChatID != 0 && m.msgList.Count() > 0 {
-				chatID := m.header.ChatID
-				offsetID := m.msgList.OldestID()
-				return m, func() tea.Msg { return LoadMoreMsg{ChatID: chatID, OffsetID: offsetID} }
+			if atTop {
+				return m, m.loadMoreAtTop()
 			}
 		case keys.ActionGoTop:
 			m.msgList.ScrollToTop()
-			if m.header.ChatID != 0 && m.msgList.Count() > 0 {
-				chatID := m.header.ChatID
-				offsetID := m.msgList.OldestID()
-				return m, func() tea.Msg { return LoadMoreMsg{ChatID: chatID, OffsetID: offsetID} }
-			}
+			return m, m.loadMoreAtTop()
 		case keys.ActionGoBottom:
 			m.msgList.ScrollToBottom()
 		case keys.ActionScrollHalfDown:
@@ -609,10 +616,23 @@ func (m *ChatModel) Update(msg tea.Msg) (layout.Pane, tea.Cmd) {
 				n = 1
 			}
 			m.msgList.ScrollUpBy(n)
-			if m.msgList.AtTop() && m.header.ChatID != 0 && m.msgList.Count() > 0 {
-				chatID := m.header.ChatID
-				offsetID := m.msgList.OldestID()
-				return m, func() tea.Msg { return LoadMoreMsg{ChatID: chatID, OffsetID: offsetID} }
+			if m.msgList.AtTop() {
+				return m, m.loadMoreAtTop()
+			}
+		case keys.ActionPageDown:
+			n := m.msgList.ViewHeight()
+			if n < 1 {
+				n = 1
+			}
+			m.msgList.ScrollDownBy(n)
+		case keys.ActionPageUp:
+			n := m.msgList.ViewHeight()
+			if n < 1 {
+				n = 1
+			}
+			m.msgList.ScrollUpBy(n)
+			if m.msgList.AtTop() {
+				return m, m.loadMoreAtTop()
 			}
 		case keys.ActionCursorUp:
 			atOldest := m.msgList.CursorUp()

@@ -20,6 +20,8 @@ const (
 	ActionGoBottom        Action = "go_bottom"
 	ActionScrollHalfDown  Action = "scroll_half_down"
 	ActionScrollHalfUp    Action = "scroll_half_up"
+	ActionPageDown        Action = "scroll_page_down"
+	ActionPageUp          Action = "scroll_page_up"
 	ActionCursorUp        Action = "cursor_up"
 	ActionCursorDown      Action = "cursor_down"
 	ActionInsert          Action = "insert"

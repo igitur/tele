@@ -211,6 +211,43 @@ func TestChatModel_LoadMoreMsg_OnUpAtTop(t *testing.T) {
 	assert.Equal(t, 1, lm.OffsetID) // oldest message ID
 }
 
+func TestChatModel_PageUp_LoadsMoreAtTop(t *testing.T) {
+	m := screens.NewChatModel(80, 24)
+	chat := &domain.Chat{ID: 42, Title: "Test"}
+	openChat(m, chat)
+	msgs := make([]domain.Message, 3)
+	for i := range msgs {
+		msgs[i] = domain.Message{ID: i + 1, ChatID: 42, Text: "msg", Date: time.Now()}
+	}
+	m.SetMessages(msgs)
+	// The loaded history is shorter than the viewport, so paging up is already
+	// at the top and must ask for older messages.
+	_, cmd := m.Update(keys.ActionMsg{Action: keys.ActionPageUp})
+	require.NotNil(t, cmd)
+	msg := cmd()
+	lm, ok := msg.(screens.LoadMoreMsg)
+	require.True(t, ok, "expected LoadMoreMsg, got %T", msg)
+	assert.Equal(t, int64(42), lm.ChatID)
+	assert.Equal(t, 1, lm.OffsetID) // oldest message ID
+}
+
+func TestChatModel_PageDown_AdvancesAtLeastHalfViewport(t *testing.T) {
+	m := screens.NewChatModel(80, 12)
+	openChat(m, &domain.Chat{ID: 7, Title: "T"})
+	msgs := make([]domain.Message, 60)
+	for i := range msgs {
+		msgs[i] = domain.Message{ID: i + 1, ChatID: 7, Text: "m", Date: time.Now()}
+	}
+	m.SetMessages(msgs)
+	m.Update(keys.ActionMsg{Action: keys.ActionGoTop})
+	before := m.ScrollInfo()
+	m.Update(keys.ActionMsg{Action: keys.ActionPageDown})
+	after := m.ScrollInfo()
+	assert.Greater(t, after.Offset, before.Offset, "page down must move the viewport")
+	assert.GreaterOrEqual(t, after.Offset-before.Offset, before.Visible/2,
+		"a full-page jump should be at least a half-page")
+}
+
 func TestChatModel_LoadMoreMsg_OnGoTop(t *testing.T) {
 	m := screens.NewChatModel(80, 24)
 	chat := &domain.Chat{ID: 10, Title: "X"}

@@ -51,6 +51,7 @@ var actionDisplayOrder = []keys.Action{
 	keys.ActionFocusPrev, keys.ActionFocusNext,
 	keys.ActionUp, keys.ActionDown, keys.ActionCursorUp, keys.ActionCursorDown,
 	keys.ActionGoTop, keys.ActionGoBottom, keys.ActionScrollHalfUp, keys.ActionScrollHalfDown,
+	keys.ActionPageUp, keys.ActionPageDown,
 	keys.ActionInsert, keys.ActionNormal, keys.ActionConfirm,
 	keys.ActionSearch, keys.ActionOpenContextMenu,
 	keys.ActionReply, keys.ActionReact, keys.ActionEdit, keys.ActionForward,
@@ -68,6 +69,7 @@ var navPairs = [][2]keys.Action{
 	{keys.ActionDown, keys.ActionUp},
 	{keys.ActionCursorDown, keys.ActionCursorUp},
 	{keys.ActionScrollHalfDown, keys.ActionScrollHalfUp},
+	{keys.ActionPageDown, keys.ActionPageUp},
 }
 
 func actionRank(a keys.Action) int {

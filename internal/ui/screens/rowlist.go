@@ -311,6 +311,12 @@ func (m *rowList[R]) move(action keys.Action) bool {
 	case keys.ActionScrollHalfUp:
 		m.cursor -= m.halfStep()
 		m.clampCursor()
+	case keys.ActionPageDown:
+		m.cursor += m.pageStep()
+		m.clampCursor()
+	case keys.ActionPageUp:
+		m.cursor -= m.pageStep()
+		m.clampCursor()
 	default:
 		return false
 	}
@@ -319,6 +325,14 @@ func (m *rowList[R]) move(action keys.Action) bool {
 
 func (m *rowList[R]) halfStep() int {
 	step := m.height * 2 / 3
+	if step < 1 {
+		step = 1
+	}
+	return step
+}
+
+func (m *rowList[R]) pageStep() int {
+	step := m.height
 	if step < 1 {
 		step = 1
 	}

@@ -64,6 +64,20 @@ func TestKeyMap_Resolve_Unknown(t *testing.T) {
 	assert.Equal(t, keys.ActionNone, km.Resolve(keys.ContextChatList, "F9"))
 }
 
+func TestKeyMap_Resolve_PageScroll(t *testing.T) {
+	km := keys.DefaultKeyMap()
+	assert.Equal(t, keys.ActionPageUp, km.Resolve(keys.ContextChat, "pgup"))
+	assert.Equal(t, keys.ActionPageDown, km.Resolve(keys.ContextChat, "pgdown"))
+	assert.Equal(t, keys.ActionPageUp, km.Resolve(keys.ContextChatList, "pgup"))
+	assert.Equal(t, keys.ActionPageDown, km.Resolve(keys.ContextChatList, "pgdown"))
+	// Bindable from config and carries a label.
+	assert.True(t, keys.KnownActions()[keys.ActionPageUp])
+	assert.True(t, keys.KnownActions()[keys.ActionPageDown])
+	lbl, ok := keys.Describe(keys.ContextChat, keys.ActionPageDown)
+	assert.True(t, ok)
+	assert.Equal(t, "page down", lbl.Short)
+}
+
 func TestKeyFor_SingleBinding_ReturnsIt(t *testing.T) {
 	km := keys.DefaultKeyMap()
 	assert.Equal(t, "enter", km.KeyFor(keys.ContextChatList, keys.ActionConfirm))

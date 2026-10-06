@@ -43,6 +43,8 @@ var defaultLabels = map[Action]Label{
 	ActionGoBottom:       {Short: "bottom", Long: "go to bottom"},
 	ActionScrollHalfUp:   {Short: "half up", Long: "half page up"},
 	ActionScrollHalfDown: {Short: "half down", Long: "half page down"},
+	ActionPageUp:         {Short: "page up"},
+	ActionPageDown:       {Short: "page down"},
 	// Mode / confirm / cancel.
 	ActionInsert:  {Short: "write"},
 	ActionNormal:  {Short: "normal", Long: "normal mode"},
